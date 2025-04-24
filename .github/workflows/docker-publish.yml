@@ -28,7 +28,7 @@ jobs:
       with:
         context: .
         push: true
-        tags: ghcr.io/${{ toLower(github.repository) }}:latest
+        tags: ghcr.io/${{ github.repository }}:latest
     
     - name: Trigger Portainer Stack Webhook
       run: curl -X POST ${{ secrets.PORTAINER_WEBHOOK_URL }}
