@@ -13,7 +13,7 @@ NearTRIP is an intelligent NTRIP proxy that automatically connects to the closes
 - 📊 Logs NMEA messages for diagnostic purposes
 - 🚀 Simple setup and configuration
 - 🔥 Hot reloading of configuration (change stations without server restart)
-- 🗏 Web UI to manage it all
+- 🧑‍💻 Web UI to manage it all
 
 ## Use Cases
 
