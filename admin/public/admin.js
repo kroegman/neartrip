@@ -19,7 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConnections();
     
     // Initialize map
-    initMap();    // Set up periodic refresh (every 5 seconds)
+    initMap();
+    
+    // Set up periodic refresh (every 5 seconds)
     refreshInterval = setInterval(() => {
         loadConnections();
         
@@ -28,9 +30,65 @@ document.addEventListener('DOMContentLoaded', () => {
         updateServerInfoWithoutConfigRefresh();
     }, 5000);
 
+    // Show the appropriate tab based on URL hash
+    loadTabFromUrlHash();
+
     // Setup event listeners
     setupEventListeners();
 });
+
+/**
+ * Load the appropriate tab based on the URL hash
+ */
+function loadTabFromUrlHash() {
+    // Get the hash from the URL (without the # symbol)
+    const hash = window.location.hash.substring(1) || 'stations'; // Default to stations if no hash
+    
+    // Hide all sections
+    document.querySelectorAll('#stations, #connections, #map, #settings').forEach(section => {
+        section.style.display = 'none';
+    });
+    
+    // Show appropriate sections based on hash
+    if (hash === 'home') {
+        // For home, show both stations and connections sections
+        document.getElementById('stations').style.display = 'block';
+        document.getElementById('connections').style.display = 'block';
+        
+        // Highlight the stations tab
+        document.querySelectorAll('.navbar-nav .nav-link').forEach(navLink => {
+            navLink.classList.remove('active');
+        });
+        document.querySelector('.navbar-nav .nav-link[href="#stations"]').classList.add('active');
+    } else if (['stations', 'connections', 'map', 'settings'].includes(hash)) {
+        // For other valid hashes, show just that section
+        document.getElementById(hash).style.display = 'block';
+        
+        // Highlight the appropriate nav link
+        document.querySelectorAll('.navbar-nav .nav-link').forEach(navLink => {
+            navLink.classList.remove('active');
+        });
+        document.querySelector(`.navbar-nav .nav-link[href="#${hash}"]`).classList.add('active');
+        
+        // If showing map, make sure it renders correctly
+        if (hash === 'map' && map) {
+            setTimeout(() => {
+                map.invalidateSize();
+                updateMap();
+            }, 100);
+        }
+    } else {
+        // If hash is invalid, default to stations
+        document.getElementById('stations').style.display = 'block';
+        document.getElementById('connections').style.display = 'block';
+        
+        // Highlight the stations tab
+        document.querySelectorAll('.navbar-nav .nav-link').forEach(navLink => {
+            navLink.classList.remove('active');
+        });
+        document.querySelector('.navbar-nav .nav-link[href="#stations"]').classList.add('active');
+    }
+}
 
 /**
  * Set up event listeners for all interactive elements
@@ -52,8 +110,10 @@ function setupEventListeners() {    // Add station button
     // Config editor buttons
     document.getElementById('saveConfigBtn').addEventListener('click', saveFullConfig);
     document.getElementById('cancelConfigBtn').addEventListener('click', loadConfigEditor);
-    document.getElementById('resetConfigBtn').addEventListener('click', resetToDefaultConfig);// Navigation links
-    document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
+    document.getElementById('resetConfigBtn').addEventListener('click', resetToDefaultConfig);
+
+    // Navigation links
+    document.querySelectorAll('.navbar-nav .nav-link, .navbar-brand').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const targetId = this.getAttribute('href').substring(1);
@@ -63,14 +123,26 @@ function setupEventListeners() {    // Add station button
                 section.style.display = 'none';
             });
             
-            // Show target section
-            document.getElementById(targetId).style.display = 'block';
+            // Show target section(s)
+            if (targetId === 'home') {
+                // For home, show both stations and connections sections
+                document.getElementById('stations').style.display = 'block';
+                document.getElementById('connections').style.display = 'block';
+            } else {
+                document.getElementById(targetId).style.display = 'block';
+            }
             
             // Update active nav link
             document.querySelectorAll('.navbar-nav .nav-link').forEach(navLink => {
                 navLink.classList.remove('active');
             });
-            this.classList.add('active');
+            
+            // If clicking the navbar brand, highlight the stations link
+            if (targetId === 'home') {
+                document.querySelector('.navbar-nav .nav-link[href="#stations"]').classList.add('active');
+            } else {
+                this.classList.add('active');
+            }
             
             // Refresh map if showing map view
             if (targetId === 'map' && map) {
@@ -545,7 +617,7 @@ async function resetToDefaultConfig() {
  */
 async function reloadConfig() {
     try {
-        const response = await fetch('/api/config/reload', {
+        const response = await fetch('/api/reload', {
             method: 'POST'
         });
         
