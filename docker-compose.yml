@@ -7,7 +7,7 @@ services:
     ports:
       - "2101:2101"  # Direct exposure of NTRIP port
     volumes:
-      - ./config.json:/app/config.json
+      - config:/app/config
       - logs:/app/logs
     networks:
       - traefik
@@ -20,6 +20,7 @@ services:
       - "traefik.http.services.neartrip-ui.loadbalancer.server.port=3000"  # Admin UI port
 
 volumes:
+  config:
   logs:
 
 networks:

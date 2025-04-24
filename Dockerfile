@@ -14,8 +14,15 @@ COPY . .
 # Create logs directory
 RUN mkdir -p logs
 
+# Make entrypoint script executable
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose the NTRIP port and Admin UI port
 EXPOSE 2101 3000
+
+# Set the entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Start the application
 CMD ["npm", "start"]
