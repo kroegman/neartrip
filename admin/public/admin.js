@@ -408,4 +408,259 @@ async function updateClientMarkers() {
     }
 }
 
-// Additional functions in your admin.js file...
+/**
+ * Update server info without refreshing the config editor
+ * 
+ * This function refreshes just the server status information
+ * without reloading the config editor to avoid disrupting any
+ * edits a user might be making.
+ */
+async function updateServerInfoWithoutConfigRefresh() {
+    try {
+        const response = await fetch('/api/info');
+        if (!response.ok) throw new Error('Failed to fetch server info');
+        
+        const data = await response.json();
+        
+        // Format and display server information
+        const uptime = formatUptime(data.uptime);
+        const memoryUsage = formatMemoryUsage(data.memoryUsage);
+        
+        document.getElementById('serverInfo').innerHTML = `
+            <strong>NearTRIP v${data.version}</strong> | 
+            Node ${data.nodeVersion} | 
+            Uptime: ${uptime} | 
+            Memory: ${memoryUsage} | 
+            Mount Point: ${data.config.mountPoint} | 
+            Stations: ${data.config.stations.length}
+        `;
+    } catch (error) {
+        console.error('Error updating server info:', error);
+    }
+}
+
+/**
+ * Load the configuration editor with the current config
+ */
+async function loadConfigEditor() {
+    try {
+        const response = await fetch('/api/config');
+        if (!response.ok) throw new Error('Failed to fetch configuration');
+        
+        const config = await response.json();
+        
+        // Format the JSON with 2-space indentation for better readability
+        document.getElementById('configEditor').value = JSON.stringify(config, null, 2);
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        document.getElementById('configEditor').value = `Error loading configuration: ${error.message}`;
+    }
+}
+
+/**
+ * Save the full configuration
+ */
+async function saveFullConfig() {
+    try {
+        const configText = document.getElementById('configEditor').value;
+        
+        // Validate JSON
+        let config;
+        try {
+            config = JSON.parse(configText);
+        } catch (parseError) {
+            alert(`Invalid JSON: ${parseError.message}`);
+            return;
+        }
+        
+        // Send to server
+        const response = await fetch('/api/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: configText
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save configuration');
+        }
+        
+        alert('Configuration saved successfully');
+        
+        // Reload the server info to reflect changes
+        loadServerInfo();
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        alert(`Error saving configuration: ${error.message}`);
+    }
+}
+
+/**
+ * Reset to default configuration
+ */
+async function resetToDefaultConfig() {
+    if (!confirm('Are you sure you want to reset to the default configuration? This will overwrite all your changes.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/config/reset', {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to reset configuration');
+        }
+        
+        alert('Configuration reset to defaults');
+        
+        // Reload the config editor and server info
+        loadConfigEditor();
+        loadServerInfo();
+    } catch (error) {
+        console.error('Error resetting configuration:', error);
+        alert(`Error resetting configuration: ${error.message}`);
+    }
+}
+
+/**
+ * Reload the server configuration
+ */
+async function reloadConfig() {
+    try {
+        const response = await fetch('/api/config/reload', {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to reload configuration');
+        }
+        
+        alert('Configuration reloaded successfully');
+        
+        // Reload the server info to reflect changes
+        loadServerInfo();
+    } catch (error) {
+        console.error('Error reloading configuration:', error);
+        alert(`Error reloading configuration: ${error.message}`);
+    }
+}
+
+/**
+ * Edit a station
+ * 
+ * @param {Object} station - The station data to edit
+ */
+function editStation(station) {
+    document.getElementById('formAction').value = 'edit';
+    document.getElementById('modalTitle').textContent = 'Edit Station';
+    
+    // Populate form fields
+    document.getElementById('stationMountPoint').value = station.mountPoint;
+    document.getElementById('stationCasterHost').value = station.casterHost;
+    document.getElementById('stationCasterPort').value = station.casterPort;
+    document.getElementById('stationUsername').value = station.username || '';
+    document.getElementById('stationPassword').value = station.password || '';
+    document.getElementById('stationLatitude').value = station.latitude;
+    document.getElementById('stationLongitude').value = station.longitude;
+    
+    // Store original mount point for reference in case it changes
+    document.getElementById('originalMountPoint').value = station.mountPoint;
+    
+    stationModal.show();
+}
+
+/**
+ * Save a station (add or edit)
+ */
+async function saveStation() {
+    try {
+        const formAction = document.getElementById('formAction').value;
+        const originalMountPoint = document.getElementById('originalMountPoint').value;
+        
+        // Get form values
+        const station = {
+            mountPoint: document.getElementById('stationMountPoint').value,
+            casterHost: document.getElementById('stationCasterHost').value,
+            casterPort: parseInt(document.getElementById('stationCasterPort').value, 10),
+            username: document.getElementById('stationUsername').value,
+            password: document.getElementById('stationPassword').value,
+            latitude: parseFloat(document.getElementById('stationLatitude').value),
+            longitude: parseFloat(document.getElementById('stationLongitude').value)
+        };
+        
+        // Validate required fields
+        if (!station.mountPoint || !station.casterHost || !station.casterPort ||
+            isNaN(station.latitude) || isNaN(station.longitude)) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        let url = '/api/stations';
+        let method = 'POST';
+        
+        // If editing, use PUT method and include original mount point
+        if (formAction === 'edit') {
+            url = `/api/stations/${encodeURIComponent(originalMountPoint)}`;
+            method = 'PUT';
+        }
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(station)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save station');
+        }
+        
+        stationModal.hide();
+        loadStations();
+        
+        if (map) {
+            updateStationMarkers();
+        }
+    } catch (error) {
+        console.error('Error saving station:', error);
+        alert(`Error saving station: ${error.message}`);
+    }
+}
+
+/**
+ * Delete a station
+ * 
+ * @param {string} mountPoint - The mount point of the station to delete
+ */
+async function deleteStation(mountPoint) {
+    if (!confirm(`Are you sure you want to delete station "${mountPoint}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/stations/${encodeURIComponent(mountPoint)}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to delete station');
+        }
+        
+        loadStations();
+        
+        if (map) {
+            updateStationMarkers();
+        }
+    } catch (error) {
+        console.error('Error deleting station:', error);
+        alert(`Error deleting station: ${error.message}`);
+    }
+}
