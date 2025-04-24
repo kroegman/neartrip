@@ -251,16 +251,30 @@ async function loadConnections() {
         tableBody.innerHTML = '';
         
         if (connections.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">No active connections</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="13" class="text-center">No connections found</td></tr>';
             return;
         }
         
         connections.forEach(conn => {
             const row = document.createElement('tr');
+            const isActive = conn.active === true;
+            
+            // Apply styling based on active status
+            if (!isActive) {
+                row.classList.add('connection-inactive');
+            } else {
+                row.classList.add('connection-active');
+            }
+            
             row.innerHTML = `
+                <td>
+                    <span class="status-indicator ${isActive ? 'status-active' : 'status-inactive'}" 
+                          title="${isActive ? 'Active' : 'Inactive'}"></span>
+                </td>
                 <td>${conn.id.substring(0, 8)}...</td>
                 <td>${conn.clientIp}</td>
                 <td>${formatTimestamp(conn.connectedAt)}</td>
+                <td>${conn.disconnectedAt ? formatTimestamp(conn.disconnectedAt) : '-'}</td>
                 <td>${conn.currentStation || '-'}</td>
                 <td>${conn.latitude ? conn.latitude.toFixed(6) : '-'}</td>
                 <td>${conn.longitude ? conn.longitude.toFixed(6) : '-'}</td>
@@ -268,13 +282,17 @@ async function loadConnections() {
                 <td>${conn.numSatellites !== undefined ? conn.numSatellites : '-'}</td>
                 <td>${formatBytes(conn.bytesSent)}</td>
                 <td>${formatBytes(conn.bytesReceived)}</td>
+                <td>
+                    <a href="/api/connections/${conn.id}/nmea-log" class="btn btn-sm btn-info" 
+                       download="connection-${conn.id}.nmea.log">Download</a>
+                </td>
             `;
             tableBody.appendChild(row);
         });
     } catch (error) {
         console.error('Error loading connections:', error);
         document.querySelector('#connectionsTable tbody').innerHTML = `
-            <tr><td colspan="10" class="text-center text-danger">Error loading connections: ${error.message}</td></tr>
+            <tr><td colspan="13" class="text-center text-danger">Error loading connections: ${error.message}</td></tr>
         `;
     }
     

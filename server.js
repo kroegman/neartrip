@@ -133,13 +133,16 @@ function handleClient(clientSocket) {
  * @returns {Promise<net.Socket>} The new or existing caster socket
  */
 async function handleGpggaRequest(request, clientSocket, currentCasterSocket, connectionId) {
-    // Log NMEA message
+    // Log NMEA message to the global log
     const nmeaLogPath = path.join(logsDir, 'nmea.log');
     fs.appendFile(nmeaLogPath, request + '\n', (err) => {
         if (err) {
             logger.error('Failed to write to NMEA log:', err);
         }
     });
+    
+    // Also log to connection-specific NMEA log
+    adminServer.logConnectionNMEA(connectionId, request);
       // Parse GPGGA message
     const nmeaMessage = gps.parseGPGGA(request);
 

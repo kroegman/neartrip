@@ -11,8 +11,20 @@ const fs = require('fs');
 const logger = require('../utils/logger');
 const configManager = require('../utils/config');
 
-// Store active connections for the admin interface
-const activeConnections = new Map();
+// Store all connections (active and historical) for the admin interface
+const connections = new Map();
+
+// How many days to keep connection history (7 days in milliseconds)
+const CONNECTION_HISTORY_DAYS = 7;
+const CONNECTION_HISTORY_MS = CONNECTION_HISTORY_DAYS * 24 * 60 * 60 * 1000;
+
+// Directory for storing per-connection NMEA logs
+const connectionLogsDir = path.join(__dirname, '..', 'logs', 'connections');
+
+// Ensure connection logs directory exists
+if (!fs.existsSync(connectionLogsDir)) {
+    fs.mkdirSync(connectionLogsDir, { recursive: true });
+}
 
 /**
  * Initialize the admin server
@@ -56,12 +68,15 @@ function initAdminServer(options = {}) {
     app.use(express.static(publicPath));
 
     // API endpoints
-    setupApiRoutes(app);
-
-    // Start server
+    setupApiRoutes(app);    // Start server
     const server = app.listen(port, () => {
         logger.info(`Admin server started on http://localhost:${port}`);
     });
+    
+    // Schedule regular purging of old connections
+    // Run every 6 hours (4 times per day)
+    setInterval(purgeOldConnections, 6 * 60 * 60 * 1000);
+    logger.info(`Connection history purge scheduled every 6 hours (keeping ${CONNECTION_HISTORY_DAYS} days of history)`);
 
     return { app, server };
 }
@@ -171,14 +186,52 @@ function setupApiRoutes(app) {
             logger.error('Error deleting station:', error);
             res.status(500).json({ error: 'Failed to delete station' });
         }
-    });    // Get active connections
+    });    // Get all connections (active and historical)
     app.get('/api/connections', (req, res) => {
         try {
-            const connections = Array.from(activeConnections.values());
-            res.json(connections);
+            // Convert to array and sort - active connections first, then by connected time (newest first)
+            const connectionsList = Array.from(connections.values())
+                .sort((a, b) => {
+                    // First sort by active status
+                    if (a.active && !b.active) return -1;
+                    if (!a.active && b.active) return 1;
+                    
+                    // Then by connected time (descending - newest first)
+                    return new Date(b.connectedAt) - new Date(a.connectedAt);
+                });
+                
+            res.json(connectionsList);
         } catch (error) {
             logger.error('Error fetching connections:', error);
             res.status(500).json({ error: 'Failed to fetch connections' });
+        }
+    });
+    
+    // Get NMEA log for a specific connection
+    app.get('/api/connections/:id/nmea-log', (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            if (!connections.has(id)) {
+                return res.status(404).json({ error: 'Connection not found' });
+            }
+            
+            const connection = connections.get(id);
+            
+            if (!connection.nmeaLogFile || !fs.existsSync(connection.nmeaLogFile)) {
+                return res.status(404).json({ error: 'NMEA log not found for this connection' });
+            }
+            
+            // Set headers for file download
+            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Disposition', `attachment; filename="connection-${id}.nmea.log"`);
+            
+            // Create read stream and pipe to response
+            const fileStream = fs.createReadStream(connection.nmeaLogFile);
+            fileStream.pipe(res);
+        } catch (error) {
+            logger.error('Error fetching NMEA log:', error);
+            res.status(500).json({ error: 'Failed to fetch NMEA log' });
         }
     });
     
@@ -287,14 +340,21 @@ function saveConfig(config) {
  * @param {Object} connectionInfo - Information about the connection
  */
 function trackConnection(id, connectionInfo) {
-    activeConnections.set(id, {
+    const connectionData = {
         id,
         connectedAt: new Date().toISOString(),
+        active: true,
         ...connectionInfo,
         bytesSent: 0,
-        bytesReceived: 0
-    });
+        bytesReceived: 0,
+        nmeaLogFile: path.join(connectionLogsDir, `${id}.nmea.log`)
+    };
+    
+    connections.set(id, connectionData);
     logger.debug(`Tracking connection: ${id}`);
+    
+    // Create empty log file for this connection
+    fs.writeFileSync(connectionData.nmeaLogFile, '');
 }
 
 /**
@@ -304,21 +364,72 @@ function trackConnection(id, connectionInfo) {
  * @param {Object} updates - Updated information about the connection
  */
 function updateConnection(id, updates) {
-    if (activeConnections.has(id)) {
-        const connection = activeConnections.get(id);
-        activeConnections.set(id, { ...connection, ...updates });
+    if (connections.has(id)) {
+        const connection = connections.get(id);
+        connections.set(id, { ...connection, ...updates });
     }
 }
 
 /**
- * Remove a connection from tracking
+ * Mark a connection as disconnected but keep it in history
  * 
  * @param {string} id - Unique ID for the connection
  */
 function removeConnection(id) {
-    if (activeConnections.has(id)) {
-        activeConnections.delete(id);
-        logger.debug(`Removed connection: ${id}`);
+    if (connections.has(id)) {
+        const connection = connections.get(id);
+        connections.set(id, { 
+            ...connection, 
+            active: false,
+            disconnectedAt: new Date().toISOString()
+        });
+        logger.debug(`Connection ${id} marked as disconnected`);
+    }
+}
+
+/**
+ * Log NMEA data for a specific connection
+ * 
+ * @param {string} id - Unique ID for the connection
+ * @param {string} nmeaData - NMEA sentence to log
+ */
+function logConnectionNMEA(id, nmeaData) {
+    if (connections.has(id)) {
+        const connection = connections.get(id);
+        if (connection.nmeaLogFile) {
+            fs.appendFileSync(connection.nmeaLogFile, nmeaData + '\n');
+        }
+    }
+}
+
+/**
+ * Purge old connections and their logs based on CONNECTION_HISTORY_DAYS
+ */
+function purgeOldConnections() {
+    const cutoffDate = new Date(Date.now() - CONNECTION_HISTORY_MS);
+    
+    let purgedCount = 0;
+    connections.forEach((connection, id) => {
+        // Determine the date to compare (either disconnected date or connected date)
+        const dateToCompare = connection.disconnectedAt 
+            ? new Date(connection.disconnectedAt) 
+            : new Date(connection.connectedAt);
+            
+        if (dateToCompare < cutoffDate) {
+            // Remove from memory
+            connections.delete(id);
+            
+            // Delete log file if it exists
+            if (connection.nmeaLogFile && fs.existsSync(connection.nmeaLogFile)) {
+                fs.unlinkSync(connection.nmeaLogFile);
+            }
+            
+            purgedCount++;
+        }
+    });
+    
+    if (purgedCount > 0) {
+        logger.info(`Purged ${purgedCount} old connections and their logs`);
     }
 }
 
