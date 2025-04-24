@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ntrip:
+    image: ghcr.io/smerty/neartrip:latest
+    build: .
+    ports:
+      - "2101:2101"  # Direct exposure of NTRIP port
+    volumes:
+      - ./config.json:/app/config.json
+      - logs:/app/logs
+    networks:
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=${PUBLIC_HOSTNAME:+true}"
+      - "traefik.http.routers.neartrip-ui.rule=Host(`${PUBLIC_HOSTNAME}`)"
+      - "traefik.http.routers.neartrip-ui.entrypoints=https"
+      - "traefik.http.routers.neartrip-ui.tls.certresolver=myresolver"
+      - "traefik.http.services.neartrip-ui.loadbalancer.server.port=3000"  # Admin UI port
+
+volumes:
+  logs:
+
+networks:
+  traefik:
+    external: true
