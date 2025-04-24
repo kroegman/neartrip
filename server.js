@@ -147,16 +147,19 @@ async function handleGpggaRequest(request, clientSocket, currentCasterSocket, co
         logger.warn('Invalid or incomplete GPGGA message');
         return currentCasterSocket;
     }
-    
-    const user_lat = nmeaMessage.latitude;
+      const user_lat = nmeaMessage.latitude;
     const user_lon = nmeaMessage.longitude;
+    const fixQuality = nmeaMessage.fixQuality;
+    const numSatellites = nmeaMessage.numSatellites;
 
     logger.info(`User location: ${user_lat.toFixed(6)}, ${user_lon.toFixed(6)}`);
     
-    // Update connection tracking with current location
+    // Update connection tracking with current location, fix quality and satellites count
     adminServer.updateConnection(connectionId, {
         latitude: user_lat,
-        longitude: user_lon
+        longitude: user_lon,
+        fixQuality: fixQuality,
+        numSatellites: numSatellites
     });
 
     // Find closest station
