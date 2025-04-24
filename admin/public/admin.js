@@ -412,7 +412,7 @@ async function updateStationMarkers() {
         stationMarkers = [];
         
         // Add markers for each station
-        stations.forEach(station => {
+        stations.forEach(station => {            
             if (station.latitude && station.longitude) {
                 // Use default Leaflet marker but customize the icon
                 const markerIcon = L.icon({
@@ -430,13 +430,32 @@ async function updateStationMarkers() {
                     icon: markerIcon
                 }).addTo(map);
                 
+                // Add 10km green circle around station
+                const circle10km = L.circle([station.latitude, station.longitude], {
+                    color: 'green',
+                    fillColor: '#3f3',
+                    fillOpacity: 0.1,
+                    radius: 10000 // 10km in meters
+                }).addTo(map);
+                
+                // Add 20km orange circle around station
+                const circle20km = L.circle([station.latitude, station.longitude], {
+                    color: 'orange',
+                    fillColor: '#fa3',
+                    fillOpacity: 0.1,
+                    radius: 20000 // 20km in meters
+                }).addTo(map);
+                
                 marker.bindPopup(`
                     <strong>${station.mountPoint}</strong><br>
                     ${station.casterHost}:${station.casterPort}<br>
                     Status: ${station.active ? 'Active' : 'Inactive'}
                 `);
                 
+                // Store markers and circles for later removal
                 stationMarkers.push(marker);
+                stationMarkers.push(circle10km);
+                stationMarkers.push(circle20km);
             }
         });
     } catch (error) {
