@@ -426,36 +426,40 @@ async function updateStationMarkers() {
                     shadowSize: [41, 41]
                 });
                 
-                const marker = L.marker([station.latitude, station.longitude], {
+                  const marker = L.marker([station.latitude, station.longitude], {
                     icon: markerIcon
                 }).addTo(map);
                 
-                // Add 10km green circle around station
-                const circle10km = L.circle([station.latitude, station.longitude], {
-                    color: 'green',
-                    fillColor: '#3f3',
-                    fillOpacity: 0.1,
-                    radius: 10000 // 10km in meters
-                }).addTo(map);
-                
-                // Add 20km orange circle around station
-                const circle20km = L.circle([station.latitude, station.longitude], {
-                    color: 'orange',
-                    fillColor: '#fa3',
-                    fillOpacity: 0.1,
-                    radius: 20000 // 20km in meters
-                }).addTo(map);
-                
-                marker.bindPopup(`
+                // Only add range rings for active stations
+                if (station.active) {
+                    // Add 10km green circle around station
+                    const circle10km = L.circle([station.latitude, station.longitude], {
+                        color: 'green',
+                        fillColor: '#3f3',
+                        fillOpacity: 0.1,
+                        radius: 10000 // 10km in meters
+                    }).addTo(map);
+                    
+                    // Add 20km orange circle around station
+                    const circle20km = L.circle([station.latitude, station.longitude], {
+                        color: 'orange',
+                        fillColor: '#fa3',
+                        fillOpacity: 0.1,
+                        radius: 20000 // 20km in meters
+                    }).addTo(map);
+                    
+                    // Store circles for later removal
+                    stationMarkers.push(circle10km);
+                    stationMarkers.push(circle20km);
+                }
+                  marker.bindPopup(`
                     <strong>${station.mountPoint}</strong><br>
                     ${station.casterHost}:${station.casterPort}<br>
                     Status: ${station.active ? 'Active' : 'Inactive'}
                 `);
                 
-                // Store markers and circles for later removal
+                // Store marker for later removal
                 stationMarkers.push(marker);
-                stationMarkers.push(circle10km);
-                stationMarkers.push(circle20km);
             }
         });
     } catch (error) {
