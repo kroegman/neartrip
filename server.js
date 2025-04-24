@@ -74,17 +74,16 @@ function handleClient(clientSocket) {
                 clientSocket.end();
                 return;
             } 
-            
-            // Handle GPGGA location data
+              // Handle GPGGA location data
             else if (request.startsWith(NTRIP.REQUEST_TYPES.GPGGA)) {
-                handleGpggaRequest(request, clientSocket, casterSocket)
+                handleGpggaRequest(request, clientSocket, casterSocket, connectionId)
                     .then(newCasterSocket => {
                         casterSocket = newCasterSocket;
                     })
                     .catch(error => {
                         logger.error(`Error handling GPGGA request: ${error.message}`);
                     });
-            } 
+            }
             
             // Handle mountpoint request
             else if (request.startsWith(`${NTRIP.REQUEST_TYPES.MOUNTPOINT}${config.mountPoint}`)) {
@@ -130,9 +129,10 @@ function handleClient(clientSocket) {
  * @param {string} request - The GPGGA request string
  * @param {net.Socket} clientSocket - The client socket
  * @param {net.Socket} currentCasterSocket - The current caster socket (if any)
+ * @param {string} connectionId - The unique ID for this connection
  * @returns {Promise<net.Socket>} The new or existing caster socket
  */
-async function handleGpggaRequest(request, clientSocket, currentCasterSocket) {
+async function handleGpggaRequest(request, clientSocket, currentCasterSocket, connectionId) {
     // Log NMEA message
     const nmeaLogPath = path.join(logsDir, 'nmea.log');
     fs.appendFile(nmeaLogPath, request + '\n', (err) => {
