@@ -200,62 +200,68 @@ function setupApiRoutes(app) {
         }
     });
 
-    // Get the full configuration
-    app.get('/api/fullconfig', (req, res) => {
+    // Get full configuration
+    app.get('/api/config', (req, res) => {
         try {
             const config = configManager.getConfig();
             res.json(config);
         } catch (error) {
-            logger.error('Error fetching full configuration:', error);
-            res.status(500).json({ error: 'Failed to fetch full configuration' });
-        }
-    });    // Update the full configuration
-    app.post('/api/fullconfig', (req, res) => {
-        try {
-            const newConfig = req.body;
-            
-            // Enhanced validation with specific error messages
-            const validationErrors = [];
-            
-            // Check required fields
-            if (!newConfig.port) {
-                validationErrors.push('Missing required field: port');
-            } else if (typeof newConfig.port !== 'number' || newConfig.port < 1 || newConfig.port > 65535) {
-                validationErrors.push('Port must be a number between 1 and 65535');
-            }
-            
-            if (!newConfig.mountPoint) {
-                validationErrors.push('Missing required field: mountPoint');
-            } else if (typeof newConfig.mountPoint !== 'string' || newConfig.mountPoint.trim() === '') {
-                validationErrors.push('Mount point must be a non-empty string');
-            }
-            
-            // If we have validation errors, return them
-            if (validationErrors.length > 0) {
-                return res.status(400).json({ 
-                    error: 'Configuration validation failed', 
-                    validationErrors 
-                });
-            }
-            
-            // Save the configuration
-            saveConfig(newConfig);
-            
-            // Reload the configuration to apply changes
-            configManager.reloadConfig();
-            
-            res.json({ success: true, message: 'Configuration updated successfully' });
-        } catch (error) {
-            logger.error('Error updating full configuration:', error);
-            res.status(500).json({ error: 'Failed to update full configuration' });
+            logger.error('Error fetching configuration:', error);
+            res.status(500).json({ error: 'Failed to fetch configuration' });
         }
     });
 
-    // Force reload configuration
+    // Update configuration
+    app.put('/api/config', (req, res) => {
+        try {
+            const newConfig = req.body;
+            
+            // Validate required fields
+            if (!newConfig.mountPoint || !newConfig.stations || !Array.isArray(newConfig.stations)) {
+                return res.status(400).json({ error: 'Invalid configuration format' });
+            }
+            
+            // Save the new config
+            saveConfig(newConfig);
+            
+            // Get the updated config to return (without sensitive info)
+            const config = configManager.getConfig();
+            const { adminPassword, ...safeConfig } = config;
+            
+            res.json(safeConfig);
+        } catch (error) {
+            logger.error('Error updating configuration:', error);
+            res.status(500).json({ error: 'Failed to update configuration' });
+        }
+    });
+
+    // Reset configuration to defaults
+    app.post('/api/config/reset', (req, res) => {
+        try {
+            // Reset config to default values
+            configManager.resetToDefaultConfig();
+            
+            // Get the updated config to return (without sensitive info)
+            const config = configManager.getConfig();
+            const { adminPassword, ...safeConfig } = config;
+            
+            res.json(safeConfig);
+        } catch (error) {
+            logger.error('Error resetting configuration:', error);
+            res.status(500).json({ error: 'Failed to reset configuration' });
+        }
+    });
+
+    // Reload configuration from disk
     app.post('/api/reload', (req, res) => {
         try {
-            const newConfig = configManager.reloadConfig();
-            res.json({ success: true, message: 'Configuration reloaded successfully' });
+            // Reload config from disk
+            const config = configManager.reloadConfig();
+            
+            // Return the reloaded config (without sensitive info)
+            const { adminPassword, ...safeConfig } = config;
+            
+            res.json(safeConfig);
         } catch (error) {
             logger.error('Error reloading configuration:', error);
             res.status(500).json({ error: 'Failed to reload configuration' });
