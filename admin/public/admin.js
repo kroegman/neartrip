@@ -342,12 +342,20 @@ async function updateStationMarkers() {
         // Add markers for each station
         stations.forEach(station => {
             if (station.latitude && station.longitude) {
+                // Use default Leaflet marker but customize the icon
+                const markerIcon = L.icon({
+                    iconUrl: station.active ? 
+                        'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png' : 
+                        'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+                
                 const marker = L.marker([station.latitude, station.longitude], {
-                    icon: L.divIcon({
-                        className: station.active ? 'marker-station-active' : 'marker-station-inactive',
-                        html: `<div class="marker-icon"></div>`,
-                        iconSize: [20, 20]
-                    })
+                    icon: markerIcon
                 }).addTo(map);
                 
                 marker.bindPopup(`
@@ -381,12 +389,18 @@ async function updateClientMarkers() {
         // Add markers for each client
         connections.forEach(conn => {
             if (conn.latitude && conn.longitude) {
+                // Use a blue marker for clients
+                const clientIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+                
                 const marker = L.marker([conn.latitude, conn.longitude], {
-                    icon: L.divIcon({
-                        className: 'marker-client',
-                        html: `<div class="marker-icon"></div>`,
-                        iconSize: [20, 20]
-                    })
+                    icon: clientIcon
                 }).addTo(map);
                 
                 // Include fix quality and satellites in the popup
