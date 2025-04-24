@@ -13,6 +13,7 @@ NearTRIP is an intelligent NTRIP proxy that automatically connects to the closes
 - 📊 Logs NMEA messages for diagnostic purposes
 - 🚀 Simple setup and configuration
 - 🔥 Hot reloading of configuration (change stations without server restart)
+- 🗏 Web UI to manage it all
 
 ## Use Cases
 
@@ -47,12 +48,15 @@ The `config.json` file contains all the settings needed to run NearTRIP:
 
 ```json
 {
-  "username": "your_username",
-  "password": "your_password",
+  "username": "your_ntrip_username",
+  "password": "your_ntrip_password",
   "interface": "0.0.0.0",
   "port": 2101,
   "mountPoint": "NEAR-Station",
   "userAgent": "NearTRIP/1.0",
+  "adminPort": 2101,
+  "adminUsername": "your_adminui_username",
+  "adminPassword": "your_adminui_password",
   "stations": [
     {
       "mountPoint": "STATION1",
@@ -96,19 +100,6 @@ npm start
 ```
 
 Connect your GNSS receiver to the NearTRIP server using the IP address and port specified in your configuration.
-
-## Development
-
-```
-# Run in development mode with auto-restart
-npm run dev
-
-# Run tests
-npm test
-
-# Run tests with coverage report
-npm run test:coverage
-```
 
 ## How it Works
 
