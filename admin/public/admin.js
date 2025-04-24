@@ -301,4 +301,111 @@ function formatTimestamp(timestamp) {
     return `${hours}:${minutes}:${seconds}`;
 }
 
+/**
+ * Initialize the map
+ */
+function initMap() {
+    // Create a map centered around a default location
+    map = L.map('mapContainer').setView([37.7749, -122.4194], 5);
+    
+    // Add the OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    // Update the map with station and client markers
+    updateMap();
+}
+
+/**
+ * Update the map with all markers
+ */
+function updateMap() {
+    updateStationMarkers();
+    updateClientMarkers();
+}
+
+/**
+ * Update the station markers on the map
+ */
+async function updateStationMarkers() {
+    try {
+        const response = await fetch('/api/stations');
+        if (!response.ok) throw new Error('Failed to fetch stations');
+        
+        const stations = await response.json();
+        
+        // Clear existing station markers
+        stationMarkers.forEach(marker => marker.remove());
+        stationMarkers = [];
+        
+        // Add markers for each station
+        stations.forEach(station => {
+            if (station.latitude && station.longitude) {
+                const marker = L.marker([station.latitude, station.longitude], {
+                    icon: L.divIcon({
+                        className: station.active ? 'marker-station-active' : 'marker-station-inactive',
+                        html: `<div class="marker-icon"></div>`,
+                        iconSize: [20, 20]
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <strong>${station.mountPoint}</strong><br>
+                    ${station.casterHost}:${station.casterPort}<br>
+                    Status: ${station.active ? 'Active' : 'Inactive'}
+                `);
+                
+                stationMarkers.push(marker);
+            }
+        });
+    } catch (error) {
+        console.error('Error updating station markers:', error);
+    }
+}
+
+/**
+ * Update the client markers on the map
+ */
+async function updateClientMarkers() {
+    try {
+        const response = await fetch('/api/connections');
+        if (!response.ok) throw new Error('Failed to fetch connections');
+        
+        const connections = await response.json();
+        
+        // Clear existing client markers
+        clientMarkers.forEach(marker => marker.remove());
+        clientMarkers = [];
+        
+        // Add markers for each client
+        connections.forEach(conn => {
+            if (conn.latitude && conn.longitude) {
+                const marker = L.marker([conn.latitude, conn.longitude], {
+                    icon: L.divIcon({
+                        className: 'marker-client',
+                        html: `<div class="marker-icon"></div>`,
+                        iconSize: [20, 20]
+                    })
+                }).addTo(map);
+                
+                // Include fix quality and satellites in the popup
+                marker.bindPopup(`
+                    <strong>Client ID:</strong> ${conn.id.substring(0, 8)}...<br>
+                    <strong>IP:</strong> ${conn.clientIp}<br>
+                    <strong>Current Station:</strong> ${conn.currentStation || '-'}<br>
+                    <strong>Fix Quality:</strong> ${getFixQualityText(conn.fixQuality)}<br>
+                    <strong>Satellites:</strong> ${conn.numSatellites !== undefined ? conn.numSatellites : '-'}<br>
+                    <strong>Data Sent:</strong> ${formatBytes(conn.bytesSent)}<br>
+                    <strong>Data Received:</strong> ${formatBytes(conn.bytesReceived)}
+                `);
+                
+                clientMarkers.push(marker);
+            }
+        });
+    } catch (error) {
+        console.error('Error updating client markers:', error);
+    }
+}
+
 // Additional functions in your admin.js file...
