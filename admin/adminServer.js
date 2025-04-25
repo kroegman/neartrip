@@ -437,5 +437,6 @@ module.exports = {
     initAdminServer,
     trackConnection,
     updateConnection,
-    removeConnection
+    removeConnection,
+    logConnectionNMEA
 };
