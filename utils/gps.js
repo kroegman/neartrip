@@ -62,7 +62,7 @@ function parseGPGGA(sentence) {
         // Parse the GPGGA fields
         const fields = data.split(',');
 
-        if (fields[0] !== '$GPGGA') {
+        if (fields[0] !== '$GNGGA') {
             logger.warn(`Not a GPGGA sentence: ${fields[0]}`);
             return null;
         }
